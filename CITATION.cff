@@ -27,7 +27,7 @@ authors:
     family-names: Nguyen
     email: quoc.dinh.nguyen@umontreal.ca
 license: CC-BY-NC-4.0
-repository-code: "TODO: insert GitHub URL after publishing"
+repository-code: "https://github.com/ng-lab-montreal/mobi-g"
 preferred-citation:
   type: article
   title: "A Labeled Accelerometer Dataset of Steps and Postures Across Diverse Mobility and Frailty Levels in Older Adults in a Hospital Setting"
@@ -55,6 +55,6 @@ preferred-citation:
     - given-names: Quoc Dinh
       family-names: Nguyen
       email: quoc.dinh.nguyen@umontreal.ca
-  journal: "TODO: Scientific Data (pending acceptance)"
+  journal: "TODO: Add journal here"
   year: 2026
   doi: "TODO: insert DOI upon publication"
