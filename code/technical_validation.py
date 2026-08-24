@@ -35,8 +35,8 @@ PROJECT_ROOT = _HERE.parent
 DATA_ROOT       = Path(os.environ.get("MOBI_G_DATA_ROOT", PROJECT_ROOT / "data"))
 DATA_WITH_LABEL = DATA_ROOT / "data_with_label"
 
-OUT_DIR = _HERE.parent / "technical_validation"
-FIG_DIR = _HERE.parent / "figures" / "technical_validation"
+OUT_DIR = _HERE / "technical_validation"
+FIG_DIR = _HERE / "figures" / "technical_validation"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -119,7 +119,6 @@ for (participant, recording), grp in flat.groupby(["participant", "recording"]):
     dts = np.diff(ts_s)
     dts = dts[dts >= 0]   # guard against any out-of-order rows
     label_gap_mask = dts > LABEL_GAP_CUTOFF_S
-    n_label_gaps   = int(label_gap_mask.sum())
     real_dts       = dts[~label_gap_mask]
     n_intervals    = len(real_dts)
 
@@ -155,7 +154,6 @@ for (participant, recording), grp in flat.groupby(["participant", "recording"]):
         n_bursts    = n_bursts,
         pct_bursts  = round(n_bursts / n_intervals * 100, 3) if n_intervals > 0 else float("nan"),
         max_gap_s   = round(max_gap_s, 4) if n_intervals > 0 else float("nan"),
-        n_label_gaps = n_label_gaps,
         flag        = flag,
     ))
 
@@ -168,12 +166,10 @@ print(f"  {len(ts_df)} labeled recordings  |  {n_ok} OK  |  {n_bad} flagged")
 print(f"  actual_fs  mean={ts_df['actual_fs'].mean():.3f}  "
       f"SD={ts_df['actual_fs'].std():.3f}  "
       f"range=[{ts_df['actual_fs'].min():.3f}, {ts_df['actual_fs'].max():.3f}]")
-print(f"  label-driven exclusions (>{LABEL_GAP_CUTOFF_S * 1000:.0f}ms, excluded from continuity checks): "
-      f"{ts_df['n_label_gaps'].sum()} total across {(ts_df['n_label_gaps'] > 0).sum()} recordings")
 if n_bad:
     bad = ts_df[ts_df["flag"] != "OK"]
     print(bad[["participant", "file", "actual_fs", "n_gaps", "pct_gaps", "n_bursts", "pct_bursts",
-               "max_gap_s", "n_label_gaps", "flag"]]
+               "max_gap_s", "flag"]]
           .to_string(index=False))
 print("  → 01_sample_rate_continuity.csv\n")
 
@@ -290,14 +286,15 @@ print("SECTION 4 — Axis statistics per posture label and step")
 print("=" * 72)
 
 def _axis_stats(subset: pd.DataFrame, label: str) -> dict:
-    # Per-recording stats, then mean across recordings (absolute scale)
+    # Per-recording stats, then mean across recordings
+    # (mean/std on |axis| — orientation-independent magnitude; min/max signed — preserves range)
     row = {"label": label, "n_recordings": subset["recording"].nunique()}
     for ax in AXES:
         grp = subset.groupby("recording")[ax]
         row[f"{ax}_mean"] = grp.apply(lambda s: s.abs().mean()).mean()
         row[f"{ax}_std"]  = grp.apply(lambda s: s.abs().std()).mean()
-        row[f"{ax}_min"]  = grp.apply(lambda s: s.abs().min()).mean()
-        row[f"{ax}_max"]  = grp.apply(lambda s: s.abs().max()).mean()
+        row[f"{ax}_min"]  = grp.apply(lambda s: s.min()).mean()
+        row[f"{ax}_max"]  = grp.apply(lambda s: s.max()).mean()
     return row
 
 # 4a — per posture
@@ -310,8 +307,11 @@ ps_df.to_csv(OUT_DIR / "04a_posture_axis_stats.csv", index=False, float_format="
 print("Posture axis statistics:")
 print(ps_df.to_string(index=False, float_format="%.3f"))
 
-# 4b — step=1
-step_df = pd.DataFrame([_axis_stats(flat[flat["step"] == 1], "step=1")])
+# 4b — step=1 vs step=0
+step_df = pd.DataFrame([
+    _axis_stats(flat[flat["step"] == 1], "step=1"),
+    _axis_stats(flat[flat["step"] == 0], "step=0"),
+])
 step_df.to_csv(OUT_DIR / "04b_step_axis_stats.csv", index=False, float_format="%.4f")
 print("\nStep axis statistics:")
 print(step_df.to_string(index=False, float_format="%.3f"))

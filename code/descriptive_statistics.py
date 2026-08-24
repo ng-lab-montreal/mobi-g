@@ -35,7 +35,7 @@ PARTICIPANTS_CSV = Path(os.environ.get(
     PROJECT_ROOT / "data" / "participants.csv",
 ))
 
-OUT_DIR = _HERE.parent / "descriptive_statistics"
+OUT_DIR = _HERE / "descriptive_statistics"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 FS = 52.0   # Hz

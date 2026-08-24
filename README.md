@@ -66,10 +66,10 @@ python descriptive_statistics.py
 ```
 
 Each script prints a progress log to the console and writes its outputs to
-sibling directories created next to `code/`:
+directories created next to the script itself, inside `code/`:
 
-- `technical_validation/` and `figures/technical_validation/`
-- `descriptive_statistics/`
+- `code/technical_validation/` and `code/figures/technical_validation/`
+- `code/descriptive_statistics/`
 
 ## Citing
 
