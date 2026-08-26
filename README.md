@@ -33,8 +33,7 @@ data descriptor paper. The dataset itself is not included here — see
 
 These scripts expect the **labeled** dataset (`data_with_label/`) and
 `participants.csv`, as described in the data descriptor paper's Data
-Availability section. Download the dataset from [DOI/repository to be
-inserted upon publication] and place it locally, or point the scripts at it
+Availability section. Download the dataset from doi:10.5683/SP4/BL2YTA and place it locally, or point the scripts at it
 via environment variables:
 
 | Variable | Purpose | Default |
