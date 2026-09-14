@@ -77,5 +77,6 @@ see `CITATION.cff`.
 
 ## License
 
-Released under CC BY-NC 4.0 — see `LICENSE`. Non-commercial use with
-attribution.
+Released under CC BY-SA 4.0 — see `LICENSE`. Share and adapt, even
+commercially, as long as attribution is given and derivatives are shared
+under the same license.

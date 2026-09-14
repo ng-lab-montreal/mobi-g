@@ -26,7 +26,7 @@ authors:
   - given-names: Quoc Dinh
     family-names: Nguyen
     email: quoc.dinh.nguyen@umontreal.ca
-license: CC-BY-NC-4.0
+license: CC-BY-SA-4.0
 repository-code: "https://github.com/ng-lab-montreal/mobi-g"
 preferred-citation:
   type: article
