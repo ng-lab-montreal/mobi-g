@@ -5,3 +5,4 @@ figures/
 __pycache__/
 *.pyc
 .DS_Store
+gotov_comparison/
