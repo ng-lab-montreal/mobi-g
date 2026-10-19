@@ -4,9 +4,9 @@ Descriptive statistics for Mobi-G data.
 Sections:
   1. Recording duration                 — minutes of posture and step count data
   2. Descriptive tables
-       Table 1 — participant characteristics (mean±SD, n%)
-       Table 2 — recording counts per activity × stratification variable
-       Table 3 — per-participant activity presence + step counts by activity
+       Descriptive table 1 — participant characteristics (mean±SD, n%)
+       Descriptive table 2 — recording counts per activity × stratification variable
+       Descriptive table 3 — per-participant activity presence + step counts by activity
 
 Runs entirely on the labeled dataset (data/data_with_label/).
 
@@ -184,7 +184,7 @@ print("=" * 72)
 print("SECTION 2 — Descriptive tables")
 print("=" * 72)
 
-# ── TABLE 1: participant characteristics ─────────────────────────────────────
+# ── DESCRIPTIVE TABLE 1: participant characteristics ─────────────────────────
 CONTINUOUS_VARS  = ["age_midpoint", "gait_speed", "sppb", "function_oars", "cfs"]
 CATEGORICAL_VARS = ["age_group", "sex", "gait_pattern", "walking_aid",
                     "transferring_ability", "cognitive_impairment", "orthopedic_history"]
@@ -212,10 +212,10 @@ for col in CATEGORICAL_VARS:
         })
 
 t1_df = pd.DataFrame(t1_rows)
-t1_df.to_csv(OUT_DIR / "table1_characteristics.csv", index=False)
-print("TABLE 1 — Participant characteristics")
+t1_df.to_csv(OUT_DIR / "table_desc1_characteristics.csv", index=False)
+print("DESCRIPTIVE TABLE 1 — Participant characteristics")
 print(t1_df.to_string(index=False))
-print("\n  → table1_characteristics.csv\n")
+print("\n  → table_desc1_characteristics.csv\n")
 
 # ── Build recording inventory ─────────────────────────────────────────────────
 rec_rows = []
@@ -236,7 +236,7 @@ rec_df = rec_df.join(pdf, on="participant", how="left")
 rec_df = _binarize_df(rec_df)
 activities = sorted(rec_df["activity"].unique())
 
-# ── TABLE 2: recordings per activity × stratification ────────────────────────
+# ── DESCRIPTIVE TABLE 2: recordings per activity × stratification ────────────
 def _rec_counts(subset: pd.DataFrame) -> dict:
     vc = subset["activity"].value_counts()
     return {act: int(vc.get(act, 0)) for act in activities}
@@ -275,12 +275,12 @@ for sv_label, sv_col in STRAT_VARS:
         t2_rows.append(row)
 
 t2_df = pd.DataFrame(t2_rows, columns=["stratum", "group", "n_participants", "n_recordings"] + activities)
-t2_df.to_csv(OUT_DIR / "table2_recordings_by_activity.csv", index=False)
-print("TABLE 2 — Recording counts per activity × stratification")
+t2_df.to_csv(OUT_DIR / "table_desc2_recordings_by_activity.csv", index=False)
+print("DESCRIPTIVE TABLE 2 — Recording counts per activity × stratification")
 print(t2_df.to_string(index=False))
-print("\n  → table2_recordings_by_activity.csv\n")
+print("\n  → table_desc2_recordings_by_activity.csv\n")
 
-# ── TABLE 3: per-participant activity presence + step counts ──────────────────
+# ── DESCRIPTIVE TABLE 3: per-participant activity presence + step counts ──────
 t3_rows = []
 for pid in sorted(flat["participant"].unique()):
     sub_p = flat[flat["participant"] == pid]
@@ -295,10 +295,10 @@ for pid in sorted(flat["participant"].unique()):
     t3_rows.append(row)
 
 t3_df = pd.DataFrame(t3_rows).set_index("participant").sort_index()
-t3_df.to_csv(OUT_DIR / "table3_per_participant.csv")
-print("TABLE 3 — Per-participant recording counts and step totals by activity")
+t3_df.to_csv(OUT_DIR / "table_desc3_per_participant.csv")
+print("DESCRIPTIVE TABLE 3 — Per-participant recording counts and step totals by activity")
 print(t3_df.to_string())
-print("\n  → table3_per_participant.csv\n")
+print("\n  → table_desc3_per_participant.csv\n")
 
 print("=" * 72)
 print("Descriptive statistics complete.")

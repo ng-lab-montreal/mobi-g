@@ -97,6 +97,13 @@ Outputs that appear in the data descriptor paper are named after it:
 | `gotov_comparison/table3_mobig_vs_gotov.csv` | Table III |
 | `figures/technical_validation/fig3_step_waveforms.png` (data: `technical_validation/fig3_step_waveforms.csv`, `fig3_step_waveform_groups.csv`) | Figure 3 |
 
+Additional descriptive outputs, provided with the code but not in the paper,
+carry a `desc` prefix: `descriptive_statistics/table_desc1-3_*.csv`
+(participant characteristics, recordings by activity and stratification
+variable, per-participant summary) and
+`figures/technical_validation/fig_desc1-2_*.png` (per-participant axis
+checks). Other CSVs are named after the script section that produces them.
+
 ## Citing
 
 If you use this code, please cite the accompanying data descriptor paper —

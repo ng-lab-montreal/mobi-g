@@ -433,15 +433,15 @@ def _plot_checks_figure(checks, suptitle, filename):
     print(f"  Saved {filename}\n")
     return fig
 
-fig5a = _plot_checks_figure(
+fig_desc1 = _plot_checks_figure(
     POSTURE_CHECKS,
-    "Fig 5a — Prespecified axis checks per participant (postures)",
-    "fig5a_prespecified_checks_postures.png",
+    "Descriptive figure 1 — Prespecified axis checks per participant (postures)",
+    "fig_desc1_prespecified_checks_postures.png",
 )
-fig5b = _plot_checks_figure(
+fig_desc2 = _plot_checks_figure(
     STEP_CHECKS,
-    "Fig 5b — Prespecified axis checks per participant (step=1 vs step=0)",
-    "fig5b_prespecified_checks_steps.png",
+    "Descriptive figure 2 — Prespecified axis checks per participant (step=1 vs step=0)",
+    "fig_desc2_prespecified_checks_steps.png",
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
