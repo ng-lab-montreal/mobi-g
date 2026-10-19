@@ -9,14 +9,20 @@ Sections (run in this order):
                                            during labeling), not sensor gaps
   2. Accelerometer calibration check     — static posture magnitude ≈ 1 g
   3. Outlier / saturation detection      — labeled data, sensor range ±8 g
-  4. Axis statistics per posture & step — labeled data: mean / SD / min / max
+  4. Axis statistics per posture & step — labeled data: mean / SD / P1 / P99
+                                           of |axis|
   5. Prespecified axis checks           — per-participant strip plots
        lying→y, sitting/standing→x, walking/step→y
+  6. Step waveforms                     — time-normalized norm of step = 1
+                                           windows by protocol, gait speed and
+                                           walking aid
 
 Environment variables (not needed if you place the dataset under
 <project_root>/data/):
   MOBI_G_DATA_ROOT   path to the data directory (must contain data_with_label/)
                   default: <project_root>/data
+  MOBI_G_PARTICIPANTS_CSV  full path to participants.csv
+                  default: <MOBI_G_DATA_ROOT>/participants.csv
 
 Output CSVs saved to  technical_validation/
 Figures saved to      figures/technical_validation/
@@ -34,6 +40,7 @@ _HERE        = Path(__file__).resolve().parent if "__file__" in globals() else P
 PROJECT_ROOT = _HERE.parent
 DATA_ROOT       = Path(os.environ.get("MOBI_G_DATA_ROOT", PROJECT_ROOT / "data"))
 DATA_WITH_LABEL = DATA_ROOT / "data_with_label"
+PARTICIPANTS_CSV = Path(os.environ.get("MOBI_G_PARTICIPANTS_CSV", DATA_ROOT / "participants.csv"))
 
 OUT_DIR = _HERE / "technical_validation"
 FIG_DIR = _HERE / "figures" / "technical_validation"
@@ -217,6 +224,7 @@ print(f"  {len(calib_df)} static recordings  |  {n_ok} OK  |  {len(calib_df) - n
       f"(>±{CALIB_TOL_PCT}% from {GRAVITY_MS2} m/s²)")
 print(f"  magnitude (m/s²)  mean={calib_df['mag_mean'].mean():.3f}  SD={calib_df['mag_mean'].std():.3f}  "
       f"range=[{calib_df['mag_mean'].min():.3f}, {calib_df['mag_mean'].max():.3f}]")
+print(f"  max |deviation| from {GRAVITY_MS2} m/s² = {calib_df['pct_dev_from_1g'].abs().max():.2f}%")
 if n_ok < len(calib_df):
     bad = calib_df[calib_df["flag"] != "OK"]
     print(bad.to_string(index=False))
@@ -230,10 +238,10 @@ print("  → 02_calibration_check.csv\n")
 # from labeling (e.g. wheelchair/other activities) are out of scope here, and
 # saturation is a per-sample property so dropped/unlabeled rows don't distort it.
 # This sensor's accelerometer range is ±8 g. Two checks per axis, per recording:
-#   (a) hard limit  — |value| at/beyond 8 g is not a real reading; the sensor
-#                      cannot report anything past its own range, so this is
-#                      confirmed clipping, not a heuristic bound.
-#   (b) near limit  — |value| within 5% of the 8 g ceiling: not yet clipped,
+#   (a) hard limit  — |value| at the sensor's maximum output (78.40 m/s² at
+#                      ±8 g) is clipping; the sensor cannot report anything
+#                      past its own range.
+#   (b) near limit  — |value| within 5% of the maximum output: not yet clipped,
 #                      but a near-miss worth knowing about for high-dynamic
 #                      activities (e.g. transfers, irregular walking).
 # ──────────────────────────────────────────────────────────────────────────────
@@ -242,7 +250,7 @@ print("SECTION 3 — Outlier / saturation detection (labeled data)")
 print("=" * 72)
 
 SENSOR_RANGE_G     = 8.0
-SAT_ABS_LIMIT_MS2  = SENSOR_RANGE_G * 9.81         # 78.48 m/s^2 — true saturation ceiling
+SAT_ABS_LIMIT_MS2  = 78.40                         # m/s^2 — sensor's maximum output at SENSOR_RANGE_G
 SAT_NEAR_LIMIT_MS2 = 0.95 * SAT_ABS_LIMIT_MS2      # within 5% of the ceiling
 
 sat_rows = []
@@ -286,15 +294,17 @@ print("SECTION 4 — Axis statistics per posture label and step")
 print("=" * 72)
 
 def _axis_stats(subset: pd.DataFrame, label: str) -> dict:
-    # Per-recording stats, then mean across recordings
-    # (mean/std on |axis| — orientation-independent magnitude; min/max signed — preserves range)
+    # Per-recording stats, then mean across recordings. All stats on |axis| —
+    # orientation-independent, since the anklet can be worn in two orientations
+    # that flip axis signs. P1/P99 instead of min/max — robust to isolated
+    # spikes and clipped samples.
     row = {"label": label, "n_recordings": subset["recording"].nunique()}
     for ax in AXES:
-        grp = subset.groupby("recording")[ax]
-        row[f"{ax}_mean"] = grp.apply(lambda s: s.abs().mean()).mean()
-        row[f"{ax}_std"]  = grp.apply(lambda s: s.abs().std()).mean()
-        row[f"{ax}_min"]  = grp.apply(lambda s: s.min()).mean()
-        row[f"{ax}_max"]  = grp.apply(lambda s: s.max()).mean()
+        grp = subset[ax].abs().groupby(subset["recording"])
+        row[f"{ax}_mean"] = grp.mean().mean()
+        row[f"{ax}_std"]  = grp.std().mean()
+        row[f"{ax}_p01"]  = grp.quantile(0.01).mean()
+        row[f"{ax}_p99"]  = grp.quantile(0.99).mean()
     return row
 
 # 4a — per posture
@@ -303,7 +313,7 @@ posture_stats = [
     for lbl in sorted(flat["posture"].dropna().unique())
 ]
 ps_df = pd.DataFrame(posture_stats)
-ps_df.to_csv(OUT_DIR / "04a_posture_axis_stats.csv", index=False, float_format="%.4f")
+ps_df.to_csv(OUT_DIR / "table2_posture_axis_stats.csv", index=False, float_format="%.2f")
 print("Posture axis statistics:")
 print(ps_df.to_string(index=False, float_format="%.3f"))
 
@@ -312,10 +322,10 @@ step_df = pd.DataFrame([
     _axis_stats(flat[flat["step"] == 1], "step=1"),
     _axis_stats(flat[flat["step"] == 0], "step=0"),
 ])
-step_df.to_csv(OUT_DIR / "04b_step_axis_stats.csv", index=False, float_format="%.4f")
+step_df.to_csv(OUT_DIR / "table2_step_axis_stats.csv", index=False, float_format="%.2f")
 print("\nStep axis statistics:")
 print(step_df.to_string(index=False, float_format="%.3f"))
-print("\n  → 04a_posture_axis_stats.csv  04b_step_axis_stats.csv\n")
+print("\n  → table2_posture_axis_stats.csv  table2_step_axis_stats.csv\n")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -433,6 +443,116 @@ fig5b = _plot_checks_figure(
     "Fig 5b — Prespecified axis checks per participant (step=1 vs step=0)",
     "fig5b_prespecified_checks_steps.png",
 )
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SECTION 6 — AVERAGE STEP WAVEFORMS
+# ──────────────────────────────────────────────────────────────────────────────
+# Signal: acceleration norm sqrt(x² + y² + z²) — orientation-independent, so no
+# axis sign harmonization is needed across anklet orientations.
+# Each contiguous step = 1 window (the full non-baseline waveform of one step of
+# the instrumented foot, not crossing a label-driven gap) is time-normalized to
+# 101 points (0–100% of step duration). Steps are averaged within participant
+# first, then across participants: grand mean ± SD across participants.
+# Splits: protocol vs naturalistic; gait speed ≥ 0.6 vs < 0.6 m/s (threshold of
+# the step-counting accuracy reference; participants with missing gait speed
+# excluded from that panel only); no aid or cane vs walker or wheelchair.
+# ──────────────────────────────────────────────────────────────────────────────
+print("=" * 72)
+print("SECTION 6 — Average step waveforms (acceleration norm)")
+print("=" * 72)
+
+N_PTS            = 101
+MIN_STEP_SAMPLES = 5
+GAIT_SPEED_CUT   = 0.6   # m/s
+
+curves, step_rows, n_short = [], [], 0
+for (participant, recording, protocol), grp in flat.groupby(["participant", "recording", "protocol"], sort=False):
+    st = grp["step"].to_numpy()
+    if not (st == 1).any():
+        continue
+    ts   = grp["ts_ms"].to_numpy() / 1000.0
+    norm = np.sqrt(grp["x"].to_numpy()**2 + grp["y"].to_numpy()**2 + grp["z"].to_numpy()**2)
+    seg  = np.r_[0, np.cumsum(np.diff(ts) > LABEL_GAP_CUTOFF_S)]
+    run  = np.r_[0, np.cumsum((np.diff(st) != 0) | (np.diff(seg) != 0))]
+    for r in np.unique(run[st == 1]):
+        m = run == r
+        if m.sum() < MIN_STEP_SAMPLES:
+            n_short += 1
+            continue
+        t = ts[m]
+        curves.append(np.interp(np.linspace(0, 1, N_PTS), (t - t[0]) / (t[-1] - t[0]), norm[m]))
+        step_rows.append({"participant": participant, "recording": recording,
+                          "protocol": protocol, "duration_s": t[-1] - t[0]})
+
+curves = np.vstack(curves)
+steps  = pd.DataFrame(step_rows)
+
+pp = pd.read_csv(PARTICIPANTS_CSV)
+pp["participant"] = pp["participant_id"].map(lambda i: f"P{int(i):02d}")
+pp = pp.set_index("participant")
+steps["speed_group"] = steps["participant"].map(pp["gait_speed"]).map(
+    lambda v: np.nan if pd.isna(v) else (f"< {GAIT_SPEED_CUT} m/s" if v < GAIT_SPEED_CUT else f"≥ {GAIT_SPEED_CUT} m/s"))
+steps["aid_group"] = steps["participant"].map(pp["walking_aid"]).map(
+    {"none": "No aid or cane", "cane": "No aid or cane",
+     "walker": "Walker or wheelchair", "wheelchair": "Walker or wheelchair"})
+print(f"  {len(steps)} step windows from {steps['participant'].nunique()} participants "
+      f"({n_short} windows with < {MIN_STEP_SAMPLES} samples excluded)")
+
+PANELS = [
+    ("protocol",    "Protocol",    [("protocol", "Standardized protocol"), ("naturalistic", "Naturalistic")]),
+    ("speed_group", "Gait speed",  [(f"≥ {GAIT_SPEED_CUT} m/s", f"≥ {GAIT_SPEED_CUT} m/s"),
+                                    (f"< {GAIT_SPEED_CUT} m/s", f"< {GAIT_SPEED_CUT} m/s")]),
+    ("aid_group",   "Walking aid", [("No aid or cane", "No aid or cane"),
+                                    ("Walker or wheelchair", "Walker or wheelchair")]),
+]
+
+wave_rows, group_rows = [], []
+for col, panel, groups in PANELS:
+    for val, name in groups:
+        idx = steps.index[steps[col] == val]
+        by_p = steps.loc[idx].groupby("participant")
+        p_curves = np.vstack([curves[g.index].mean(axis=0) for _, g in by_p])
+        p_dur    = by_p["duration_s"].mean()
+        mean, sd = p_curves.mean(axis=0), p_curves.std(axis=0, ddof=1)
+        for i in range(N_PTS):
+            wave_rows.append({"panel": panel, "group": name, "pct_step": i,
+                              "norm_mean": mean[i], "norm_sd": sd[i]})
+        group_rows.append({
+            "panel": panel, "group": name, "n_participants": len(p_curves), "n_steps": len(idx),
+            "duration_mean_s": p_dur.mean(), "duration_sd_s": p_dur.std(),
+        })
+
+wave_df  = pd.DataFrame(wave_rows)
+group_df = pd.DataFrame(group_rows)
+wave_df.to_csv(OUT_DIR / "fig3_step_waveforms.csv", index=False, float_format="%.3f")
+group_df.to_csv(OUT_DIR / "fig3_step_waveform_groups.csv", index=False, float_format="%.3f")
+print(group_df.to_string(index=False, float_format="%.2f"))
+
+# Figure — one panel per split, grand mean ± SD across participants
+SERIES = [("#2a78d6", "-"), ("#eb6834", "--")]   # categorical slots 1–2; line style as second cue
+x_pct = np.arange(N_PTS)
+fig, axs = plt.subplots(1, 3, figsize=(13, 3.8), sharey=True)
+for ax, (_, panel, groups) in zip(axs, PANELS):
+    for (_, name), (color, ls) in zip(groups, SERIES):
+        w = wave_df[(wave_df["panel"] == panel) & (wave_df["group"] == name)]
+        g = group_df[(group_df["panel"] == panel) & (group_df["group"] == name)].iloc[0]
+        ax.fill_between(x_pct, w["norm_mean"] - w["norm_sd"], w["norm_mean"] + w["norm_sd"],
+                        color=color, alpha=0.15, linewidth=0)
+        ax.plot(x_pct, w["norm_mean"], color=color, linestyle=ls, linewidth=2,
+                label=f"{name} (n={g['n_participants']}, {g['n_steps']:,} steps)")
+    ax.axhline(GRAVITY_MS2, color="#999999", linewidth=0.8, linestyle=":")
+    ax.set_title(panel, loc="left", fontsize=10, fontweight="bold")
+    ax.set_xlabel("Step window (%)")
+    ax.set_xlim(0, 100)
+    ax.legend(fontsize=7.5, frameon=False, loc="upper center")
+    ax.spines[["top", "right"]].set_visible(False)
+axs[0].set_ylabel("Acceleration norm (m/s²)")
+axs[0].set_ylim(top=21)
+fig.tight_layout()
+fig.savefig(FIG_DIR / "fig3_step_waveforms.png", dpi=600, bbox_inches="tight")
+plt.close(fig)
+print("\n  → fig3_step_waveforms.csv  fig3_step_waveform_groups.csv  fig3_step_waveforms.png\n")
+
 
 print("=" * 72)
 print("Technical validation complete.")
